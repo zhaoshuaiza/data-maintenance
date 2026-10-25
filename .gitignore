@@ -1,0 +1,7 @@
+# Obsidian 运行时缓存（若有）
+.obsidian/cache/
+.trash/
+
+# 临时文件
+*.tmp
+.DS_Store
