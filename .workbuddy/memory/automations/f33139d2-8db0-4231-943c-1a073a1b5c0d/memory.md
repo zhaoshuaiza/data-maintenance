@@ -39,3 +39,21 @@
 - **上传链路：** 复用 %TEMP%/ima-sync/ima_lib.js（token 解密 + MCP JSON-RPC）+ 新写 sync_upload_v2.js（动态过滤 pending → create_media → cos-nodejs-sdk-v5 putObject → add_knowledge DUPLICATE_NAME_STRATEGY_REPLACE）。串行 36 个全成功（先冒烟 3 个，再 33 个）。上传后 ima 02 folder 复核 total_size=76，新文件 create_time 均为 21:32-21:33。
 - 状态文件 ima-sync-state.json 已回写：synced 共 98 个（02=76, 03=22），last_run 记 success。
 - **后续注意：** 该自动化的 connectorIds 必须保持 ["ima-mcp"]；若 ima-mcp 再次被卸载/重置，下次运行回到通道断开状态，需重新安装授权。另：get_knowledge_list limit 上限为 50，需翻页才能取全量（本次 02/03 总数均未超 50）。
+
+### 2026-11-05 04:12（第五次运行，成功）
+- **结果：6 同步 / 98 跳过 / 0 失败**
+- **前置：ima-mcp 连接器本会话正常注入**（connectorIds=["ima-mcp"] 生效），全程用 MCP 工具直调，未走 Node 应急通道。
+- **比对方式：** get_knowledge_list 翻页取全量（02 folder 两页 76 条、03 folder 一页 22 条），与本地扫描 + state 三方交叉。
+- **增量：** 03 目录 22 个 .md 无变化全跳过；02 目录新增 6 个 txt（11-04/11-05 OCR 落地）：083金融心理学、085慢即是快、089主力操盘手法揭秘、090神奇的三角形操盘法、092超级富翁、股市晴雨表。
+- **踩坑记录 — mtime 毫秒误报：** state 记录的 mtime 为毫秒截断（.000Z），本地 stat 带亚秒精度，直接全等比较会把 36 个未变文件误判为"已修改"。本次按秒级一致判定跳过，未重传。**后续写 state 时继续用截断毫秒记录，避免此误报。**
+- **上传链路（本版简化）：** create_media 返回 upload_mode=1 预签名直传 → curl PUT（带 Content-Length/Content-Type/x-cos-acl 三个签名 header，必须与 file_size 一致）→ add_knowledge(DUPLICATE_NAME_STRATEGY_REPLACE)。6 个串行全成功，ima 02 folder 复核 total_size 76→82，新文件 create_time 04:13-04:14。
+- **注意：** add_knowledge 后文件有解析过程（media_state=1 parse_progress 渐进），列表中可能暂缺 introduction，属正常。
+- 状态文件已回写：synced 共 104 个（02=82, 03=22）。
+
+### 2026-11-07 07:36（第六次运行，成功）
+- **结果：10 同步 / 103 跳过 / 0 失败**
+- **前置：ima-mcp 连接器本会话正常注入**（connectorIds=["ima-mcp"] 生效），全程 MCP 工具直调（create_media → curl PUT 预签名直传 → add_knowledge REPLACE），未走 Node 应急通道。
+- **比对方式：** get_knowledge_list 翻页取全量（02 folder 两页共 90 条、03 folder 一页 22 条），与本地扫描 + state 三方交叉。02 folder 的 90 条 = 82 个已同步 + 8 张用户手动上传的截图（Screenshot_*.jpg，非同步范围，以后看到不用管）。
+- **增量：** 03 目录 22 个 .md 与 state 秒级一致全跳过；02 目录 9 个新增（11-05~11-07 落地：月风系列 5 个 md + 股市投机战法上/下 OCR 原文+简体 4 个 txt）+ 1 个修改重传（股市晴雨表-OCR-简体.txt，本地 11-05 04:41 被改写，size 467116→466631，REPLACE）。
+- **注意：** 上次 run 的 state 对 11-04 批 6 个文件记录的 mtime 是本地时间误标 Z（如 083 记 2026-11-04T01:06:57Z 实为本地 01:06:57），本次按秒级 + size 双比对未误判；本 run 起 mtime 一律记 UTC 毫秒截断（.000Z）。新上传文件 media_state=1 解析中属正常。
+- 状态文件已回写：synced 共 113 个（02=91, 03=22）。
